@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel Data Manager - Live Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+        
+        .upload-section {
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .upload-btn, .action-btn {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.95em;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .upload-btn:hover, .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .tabs-container {
+            background: #f8f9fa;
+            padding: 0;
+            overflow-x: auto;
+            white-space: nowrap;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .tabs {
+            display: inline-flex;
+            gap: 5px;
+            padding: 15px 20px 0 20px;
+            min-width: 100%;
+        }
+        
+        .tab {
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 0.95em;
+            font-weight: 500;
+            color: #666;
+            border-radius: 8px 8px 0 0;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+        
+        .tab:hover {
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+        }
+        
+        .tab.active {
+            background: white;
+            color: #667eea;
+            font-weight: 600;
+            border-bottom: 3px solid #667eea;
+        }
+        
+        .toolbar {
+            padding: 20px 30px;
+            background: white;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+            padding: 12px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+        
+        .search-box:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .info-badge {
+            padding: 8px 16px;
+            background: #e3f2fd;
+            color: #1976d2;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+        
+        .zoom-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .zoom-btn {
+            padding: 8px 16px;
+            background: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        
+        .zoom-btn:hover {
+            background: #e0e0e0;
+        }
+        
+        .zoom-level {
+            font-size: 0.9em;
+            color: #666;
+            min-width: 60px;
+            text-align: center;
+        }
+        
+        .content {
+            padding: 30px;
+            overflow: auto;
+        }
+        
+        .sheet-content {
+            display: none;
+        }
+        
+        .sheet-content.active {
+            display: block;
+        }
+        
+        .table-wrapper {
+            overflow: auto;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            transition: transform 0.2s;
+            transform-origin: top left;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em;
+        }
+        
+        thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        th {
+            padding: 14px 12px;
+            text-align: left;
+            font-weight: 600;
+            white-space: nowrap;
+            border-right: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        tbody tr {
+            border-bottom: 1px solid #f0f0f0;
+            transition: background-color 0.2s;
+        }
+        
+        tbody tr:hover {
+            background-color: #f8f9ff;
+        }
+        
+        td {
+            padding: 12px;
+            color: #333;
+            border-right: 1px solid #f5f5f5;
+        }
+        
+        td.editable {
+            cursor: pointer;
+            position: relative;
+        }
+        
+        td.editable:hover {
+            background-color: #fff9c4;
+        }
+        
+        td input {
+            width: 100%;
+            padding: 8px;
+            border: 2px solid #667eea;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        
+        .no-data {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+            font-size: 1.1em;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        .modal-content h2 {
+            margin-bottom: 20px;
+            color: #667eea;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .btn-primary {
+            flex: 1;
+            padding: 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        
+        .btn-secondary {
+            flex: 1;
+            padding: 12px;
+            background: #e0e0e0;
+            color: #333;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        
+        .upload-drop-zone {
+            border: 3px dashed #667eea;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .upload-drop-zone:hover {
+            background: #f8f9ff;
+            border-color: #764ba2;
+        }
+        
+        .upload-drop-zone.dragover {
+            background: #e8eaf6;
+            border-color: #764ba2;
+        }
+        
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.5em;
+            }
+            
+            .content {
+                padding: 15px;
+            }
+            
+            .toolbar {
+                padding: 15px;
+            }
+        }
+        
+        .success-message {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #4caf50;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            z-index: 2000;
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Excel Data Manager</h1>
+            <p>Upload, View, Edit & Export Excel Files Online</p>
+        </div>
+        
+        <div class="upload-section">
+            <label for="fileInput" class="upload-btn">
+                📁 Upload New Excel File
+            </label>
+            <input type="file" id="fileInput" class="file-input" accept=".xlsx,.xls,.csv">
+            
+            <button class="action-btn" onclick="exportCurrentSheet()">
+                📥 Export Current Sheet
+            </button>
+            
+            <button class="action-btn" onclick="showReplaceModal()">
+                🔄 Replace Sheet Data
+            </button>
+            
+            <button class="action-btn" onclick="saveAllChanges()">
+                💾 Save All Changes
+            </button>
+        </div>
+        
+        <div class="tabs-container" id="tabsContainer" style="display:none;">
+            <div class="tabs" id="tabs"></div>
+        </div>
+        
+        <div class="toolbar" id="toolbar" style="display:none;">
+            <input type="text" class="search-box" id="searchBox" placeholder="🔍 Search in current sheet...">
+            <span class="info-badge" id="rowCount">0 rows</span>
+            
+            <div class="zoom-controls">
+                <button class="zoom-btn" onclick="zoomOut()">∄1�7</button>
+                <span class="zoom-level" id="zoomLevel">100%</span>
+                <button class="zoom-btn" onclick="zoomIn()">+</button>
+                <button class="action-btn" onclick="takeScreenshot()">📸 Screenshot</button>
+            </div>
+        </div>
+        
+        <div class="content" id="contentContainer">
+            <div class="no-data">
+                <h2>👋 Welcome!</h2>
+                <p>Upload an Excel file to get started</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Replace Sheet Modal -->
+    <div class="modal" id="replaceModal">
+        <div class="modal-content">
+            <h2>Replace Sheet Data</h2>
+            <p>Upload a new Excel file to replace the current sheet's data</p>
+            <div class="upload-drop-zone" id="replaceDropZone">
+                <p>📂 Drag & drop an Excel file here</p>
+                <p style="margin-top:10px; color:#666;">or click to browse</p>
+            </div>
+            <input type="file" id="replaceFileInput" class="file-input" accept=".xlsx,.xls,.csv">
+            <div class="modal-buttons">
+                <button class="btn-secondary" onclick="closeReplaceModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let workbook = null;
+        let sheetsData = {};
+        let currentSheet = '';
+        let filteredData = {};
+        let editedCells = {};
+        let zoomLevel = 100;
+
+        // File upload handler
+        document.getElementById('fileInput').addEventListener('change', handleFileUpload);
+        
+        // Search handler
+        document.getElementById('searchBox').addEventListener('input', handleSearch);
+
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    workbook = XLSX.read(data, {type: 'array'});
+                    
+                    // Extract all sheets
+                    sheetsData = {};
+                    workbook.SheetNames.forEach(sheetName => {
+                        const worksheet = workbook.Sheets[sheetName];
+                        const jsonData = XLSX.utils.sheet_to_json(worksheet, {header: 1, defval: ''});
+                        sheetsData[sheetName] = jsonData;
+                    });
+                    
+                    filteredData = JSON.parse(JSON.stringify(sheetsData));
+                    editedCells = {};
+                    
+                    initializeDashboard();
+                    showSuccess('File uploaded successfully!');
+                } catch (error) {
+                    alert('Error reading file: ' + error.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function initializeDashboard() {
+            const tabsContainer = document.getElementById('tabs');
+            const contentContainer = document.getElementById('contentContainer');
+            
+            // Clear existing content
+            tabsContainer.innerHTML = '';
+            contentContainer.innerHTML = '';
+            
+            // Show tabs and toolbar
+            document.getElementById('tabsContainer').style.display = 'block';
+            document.getElementById('toolbar').style.display = 'flex';
+            
+            // Create tabs and sheet containers
+            Object.keys(sheetsData).forEach((sheetName, index) => {
+                // Create tab
+                const tab = document.createElement('button');
+                tab.className = 'tab' + (index === 0 ? ' active' : '');
+                tab.textContent = sheetName;
+                tab.onclick = () => switchSheet(sheetName);
+                tabsContainer.appendChild(tab);
+                
+                // Create sheet content div
+                const sheetDiv = document.createElement('div');
+                sheetDiv.className = 'sheet-content' + (index === 0 ? ' active' : '');
+                sheetDiv.id = `sheet-${sheetName.replace(/\s/g, '-')}`;
+                contentContainer.appendChild(sheetDiv);
+            });
+            
+            currentSheet = Object.keys(sheetsData)[0];
+            renderSheet(currentSheet);
+        }
+
+        function switchSheet(sheetName) {
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.toggle('active', tab.textContent === sheetName);
+            });
+            
+            document.querySelectorAll('.sheet-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(`sheet-${sheetName.replace(/\s/g, '-')}`).classList.add('active');
+            
+            currentSheet = sheetName;
+            document.getElementById('searchBox').value = '';
+            filteredData[sheetName] = JSON.parse(JSON.stringify(sheetsData[sheetName]));
+            renderSheet(sheetName);
+        }
+
+        function renderSheet(sheetName) {
+            const sheetDiv = document.getElementById(`sheet-${sheetName.replace(/\s/g, '-')}`);
+            const data = filteredData[sheetName];
+            
+            if (!data || data.length === 0) {
+                sheetDiv.innerHTML = '<div class="no-data">No data in this sheet</div>';
+                updateRowCount(0, 0);
+                return;
+            }
+            
+            let html = '<div class="table-wrapper" id="tableWrapper"><table><thead><tr>';
+            
+            // Headers
+            const headers = data[0];
+            headers.forEach((header, colIndex) => {
+                html += `<th>${header || `Column ${colIndex + 1}`}</th>`;
+            });
+            html += '</tr></thead><tbody>';
+            
+            // Data rows (editable)
+            for (let i = 1; i < data.length; i++) {
+                html += '<tr>';
+                data[i].forEach((cell, colIndex) => {
+                    const cellId = `${sheetName}-${i}-${colIndex}`;
+                    const displayValue = editedCells[cellId] !== undefined ? editedCells[cellId] : cell;
+                    html += `<td class="editable" onclick="editCell(this, '${sheetName}', ${i}, ${colIndex})">${displayValue || ''}</td>`;
+                });
+                html += '</tr>';
+            }
+            
+            html += '</tbody></table></div>';
+            sheetDiv.innerHTML = html;
+            
+            updateRowCount(data.length - 1, sheetsData[sheetName].length - 1);
+            applyZoom();
+        }
+
+        function editCell(td, sheetName, row, col) {
+            if (td.querySelector('input')) return;
+            
+            const currentValue = td.textContent;
+            td.innerHTML = `<input type="text" value="${currentValue}" onblur="saveCell(this, '${sheetName}', ${row}, ${col})" onkeypress="handleCellKeyPress(event, this, '${sheetName}', ${row}, ${col})">`;
+            td.querySelector('input').focus();
+        }
+
+        function handleCellKeyPress(e, input, sheetName, row, col) {
+            if (e.key === 'Enter') {
+                saveCell(input, sheetName, row, col);
+            }
+        }
+
+        function saveCell(input, sheetName, row, col) {
+            const newValue = input.value;
+            const cellId = `${sheetName}-${row}-${col}`;
+            
+            editedCells[cellId] = newValue;
+            filteredData[sheetName][row][col] = newValue;
+            
+            input.parentElement.textContent = newValue;
+            input.parentElement.style.background = '#c8e6c9';
+            
+            setTimeout(() => {
+                input.parentElement.style.background = '';
+            }, 1000);
+        }
+
+        function saveAllChanges() {
+            // Apply all edits to the original data
+            for (const cellId in editedCells) {
+                const [sheetName, row, col] = cellId.split('-');
+                sheetsData[sheetName][parseInt(row)][parseInt(col)] = editedCells[cellId];
+            }
+            
+            editedCells = {};
+            showSuccess('All changes saved!');
+        }
+
+        function handleSearch(e) {
+            const searchTerm = e.target.value.toLowerCase().trim();
+            
+            if (!searchTerm) {
+                filteredData[currentSheet] = JSON.parse(JSON.stringify(sheetsData[currentSheet]));
+                renderSheet(currentSheet);
+                return;
+            }
+            
+            const originalData = sheetsData[currentSheet];
+            const headers = originalData[0];
+            const filtered = [headers];
+            
+            for (let i = 1; i < originalData.length; i++) {
+                const row = originalData[i];
+                const rowText = row.join(' ').toLowerCase();
+                if (rowText.includes(searchTerm)) {
+                    filtered.push(row);
+                }
+            }
+            
+            filteredData[currentSheet] = filtered;
+            renderSheet(currentSheet);
+        }
+
+        function exportCurrentSheet() {
+            if (!currentSheet) return;
+            
+            const ws = XLSX.utils.aoa_to_sheet(sheetsData[currentSheet]);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, currentSheet);
+            XLSX.writeFile(wb, `${currentSheet}.xlsx`);
+            
+            showSuccess('Sheet exported successfully!');
+        }
+
+        function showReplaceModal() {
+            if (!currentSheet) {
+                alert('Please load a file first');
+                return;
+            }
+            document.getElementById('replaceModal').classList.add('active');
+            setupReplaceDropZone();
+        }
+
+        function closeReplaceModal() {
+            document.getElementById('replaceModal').classList.remove('active');
+        }
+
+        function setupReplaceDropZone() {
+            const dropZone = document.getElementById('replaceDropZone');
+            const fileInput = document.getElementById('replaceFileInput');
+            
+            dropZone.onclick = () => fileInput.click();
+            
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            });
+            
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('dragover');
+            });
+            
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    handleReplaceFile(files[0]);
+                }
+            });
+            
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleReplaceFile(e.target.files[0]);
+                }
+            });
+        }
+
+        function handleReplaceFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const newWorkbook = XLSX.read(data, {type: 'array'});
+                    
+                    // Get first sheet from new file
+                    const firstSheet = newWorkbook.SheetNames[0];
+                    const worksheet = newWorkbook.Sheets[firstSheet];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, {header: 1, defval: ''});
+                    
+                    // Replace current sheet data
+                    sheetsData[currentSheet] = jsonData;
+                    filteredData[currentSheet] = JSON.parse(JSON.stringify(jsonData));
+                    
+                    renderSheet(currentSheet);
+                    closeReplaceModal();
+                    showSuccess(`Sheet "${currentSheet}" replaced successfully!`);
+                } catch (error) {
+                    alert('Error reading file: ' + error.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function zoomIn() {
+            zoomLevel = Math.min(200, zoomLevel + 10);
+            applyZoom();
+        }
+
+        function zoomOut() {
+            zoomLevel = Math.max(50, zoomLevel - 10);
+            applyZoom();
+        }
+
+        function applyZoom() {
+            const wrapper = document.getElementById('tableWrapper');
+            if (wrapper) {
+                wrapper.style.transform = `scale(${zoomLevel / 100})`;
+            }
+            document.getElementById('zoomLevel').textContent = zoomLevel + '%';
+        }
+
+        function takeScreenshot() {
+            const wrapper = document.getElementById('tableWrapper');
+            if (!wrapper) {
+                alert('No data to screenshot');
+                return;
+            }
+            
+            showSuccess('Capturing screenshot...');
+            
+            html2canvas(wrapper, {
+                scale: 2,
+                logging: false,
+                useCORS: true
+            }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `${currentSheet}-screenshot.png`;
+                link.href = canvas.toDataURL();
+                link.click();
+                showSuccess('Screenshot saved!');
+            });
+        }
+
+        function updateRowCount(filtered, total) {
+            const badge = document.getElementById('rowCount');
+            if (filtered === total) {
+                badge.textContent = `${total} rows`;
+            } else {
+                badge.textContent = `${filtered} / ${total} rows`;
+            }
+        }
+
+        function showSuccess(message) {
+            const div = document.createElement('div');
+            div.className = 'success-message';
+            div.textContent = message;
+            document.body.appendChild(div);
+            
+            setTimeout(() => {
+                div.remove();
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
